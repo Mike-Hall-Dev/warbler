@@ -156,6 +156,45 @@ def users_show(user_id):
     return render_template('users/show.html', user=user, messages=messages)
 
 
+@app.route('/users/<int:user_id>/likes')
+def show_all_likes(user_id):
+    """Show all warbles a user has liked """
+
+    if not g.user:
+        flash("Access unauthorized.", "danger")
+        return redirect("/")
+
+    user = User.query.get_or_404(user_id)
+    likes = user.likes
+    return render_template('users/likes.html', user=user, likes=likes)
+
+
+@app.route('/users/add_like/<int:msg_id>', methods=["POST"])
+def like_warble(msg_id):
+    """Handles liking and unliking warbles """
+
+    if not g.user:
+        flash("Access unauthorized.", "danger")
+        return redirect("/")
+
+    curr_user_likes = g.user.likes
+    liked_warble = Message.query.get_or_404(msg_id)
+
+    # Prevents curr user from liking their own warble
+    if liked_warble.user_id == g.user.id:
+        flash("You can't like your own warble!", "danger")
+        return redirect('/')
+
+    if liked_warble in curr_user_likes:
+        g.user.likes = [
+            warble for warble in curr_user_likes if warble != liked_warble]
+    else:
+        g.user.likes.append(liked_warble)
+
+    db.session.commit()
+    return redirect('/')
+
+
 @app.route('/users/<int:user_id>/following')
 def show_following(user_id):
     """Show list of people this user is following."""
@@ -325,7 +364,9 @@ def homepage():
                     .limit(100)
                     .all())
 
-        return render_template('home.html', messages=messages)
+        likes = [msg.id for msg in g.user.likes]
+
+        return render_template('home.html', messages=messages, likes=likes)
 
     else:
         return render_template('home-anon.html')
